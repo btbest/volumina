@@ -1,8 +1,10 @@
 from os.path import split, join
 
-from qtpy.QtWidgets import QWidget, QApplication
+from qtpy.QtWidgets import QWidget
 from qtpy.QtCore import Signal, Slot, QSize
 from qtpy.uic import loadUiType
+
+from volumina.utility.gui import em
 
 
 class Overview3D(QWidget):
@@ -42,9 +44,8 @@ class Overview3D(QWidget):
         cls, _ = loadUiType(join(split(__file__)[0], "ui/view3d.ui"))
         self._ui = cls()
         self._ui.setupUi(self)
-        em = QApplication.instance().fontMetrics().ascent()
-        icon_size = int(em * 1.3)
-        button_size = int(em * 1.9)
+        icon_size = int(em() * 1.3)
+        button_size = int(em() * 1.9)
         for btn in (self._ui.toggle_slice_x, self._ui.toggle_slice_y, self._ui.toggle_slice_z, self._ui.dock):
             btn.setIconSize(QSize(icon_size, icon_size))
             btn.setFixedSize(QSize(button_size, button_size))
