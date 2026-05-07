@@ -30,6 +30,7 @@ from qtpy.QtWidgets import QStyledItemDelegate, QWidget, QListView, QStyle, QLab
 from volumina.layer import Layer
 from volumina.layerstack import LayerStackModel
 from volumina.utility import ShortcutManager
+from volumina.utility.gui import em, line_height, get_responsive_pixmap
 from volumina.widgets.layercontextmenu import layercontextmenu
 
 
@@ -40,10 +41,15 @@ PREV_CHANNEL_SEQ = "Ctrl+P"
 class FractionSelectionBar(QWidget):
     fractionChanged = Signal(float)
 
+    _DEFAULT_WIDTH_EM = 8.0
+    _DEFAULT_HEIGHT_EM = 0.65
+    _MIN_HEIGHT_EM = 0.15
+
     def __init__(self, initial_fraction=1.0, parent=None):
         super(FractionSelectionBar, self).__init__(parent=parent)
         self._fraction = initial_fraction
         self._lmbDown = False
+        self.setFixedHeight(round(em() * self._DEFAULT_HEIGHT_EM))
 
     def fraction(self):
         return self._fraction
@@ -84,29 +90,38 @@ class FractionSelectionBar(QWidget):
     def paintEvent(self, ev):
         painter = QPainter(self)
 
-        # calc bar offset
-        y_offset = (self.height() - self._barHeight()) // 2
-        ## prevent negative offset
-        y_offset = 0 if y_offset < 0 else y_offset
+        # Switch to physical-pixel coordinates
+        ratio = painter.device().devicePixelRatioF()
+        painter.scale(1.0 / ratio, 1.0 / ratio)
+        w = round(self.width() * ratio)
+        h = round(self.height() * ratio)
+        border_thickness = 1
 
-        # frame around fraction indicator
-        painter.setBrush(self.palette().dark())
-        painter.save()
-        ## no fill color
-        b = painter.brush()
-        b.setStyle(Qt.NoBrush)
-        painter.setBrush(b)
-        painter.drawRect(QRect(QPoint(0, y_offset), QSize(self._barWidth(), self._barHeight())))
-        painter.restore()
+        if w <= 1 or h <= 1:
+            return
 
-        # fraction indicator
-        painter.drawRect(QRect(QPoint(0, y_offset), QSize(int(self._barWidth() * self._fraction), self._barHeight())))
+        border = self.palette().color(QPalette.Text)
+        fill = self.palette().dark().color()
+
+        painter.fillRect(0, 0, w, border_thickness, border)
+        painter.fillRect(0, h - border_thickness, w, border_thickness, border)
+        painter.fillRect(0, 0, border_thickness, h, border)
+        painter.fillRect(w - border_thickness, 0, border_thickness, h, border)
+        inner_w = max(0, w - 2 * border_thickness)
+        inner_h = max(0, h - 2 * border_thickness)
+        fill_w = int(inner_w * self._fraction)
+
+        if fill_w > 0 and inner_h > 0:
+            painter.fillRect(border_thickness, border_thickness, fill_w, inner_h, fill)
 
     def sizeHint(self):
-        return QSize(100, 10)
+        return QSize(
+            round(em() * self._DEFAULT_WIDTH_EM),
+            round(em() * self._DEFAULT_HEIGHT_EM),
+        )
 
     def minimumSizeHint(self):
-        return QSize(1, 3)
+        return QSize(1, max(2, round(em() * self._MIN_HEIGHT_EM)))
 
     def _barWidth(self):
         return self.width() - 1
@@ -127,12 +142,31 @@ class FractionSelectionBar(QWidget):
 class ToggleEye(QLabel):
     activeChanged = Signal(bool)
 
+    _ICON_EM = 1.8
+
     def __init__(self, parent=None):
         super(ToggleEye, self).__init__(parent=parent)
         self._active = True
-        self._eye_open = QPixmap(":icons/icons/stock-eye-20.png")
-        self._eye_closed = QPixmap(":icons/icons/stock-eye-20-gray.png")
+
+        icon_size = round(em() * self._ICON_EM)
+
+        self._eye_open = get_responsive_pixmap(
+            ":icons/icons/stock-eye-20.png",
+            logical_size=icon_size,
+        )
+        self._eye_closed = get_responsive_pixmap(
+            ":icons/icons/stock-eye-20-gray.png",
+            logical_size=icon_size,
+        )
         self.setPixmap(self._eye_open)
+
+        # Keep label tightly wrapped around icon
+        self.setFixedSize(
+            QSize(
+                round(icon_size * 1.35),
+                round(line_height() * 1.05),
+            )
+        )
 
     def active(self):
         return self._active
@@ -158,6 +192,10 @@ class ToggleEye(QLabel):
 
 
 class LayerItemWidget(QWidget):
+
+    _CHANNEL_WIDTH_EM = 2.5
+    _EYE_COLUMN_EM = 1.8
+
     @property
     def layer(self):
         return self._layer
@@ -178,25 +216,18 @@ class LayerItemWidget(QWidget):
         super(LayerItemWidget, self).__init__(parent=parent)
         self._layer = None
 
-        self._font = QFont(QFont().defaultFamily(), 9)
-        self._fm = QFontMetrics(self._font)
         self.bar = FractionSelectionBar(initial_fraction=0.0)
-        self.bar.setFixedHeight(10)
         self.nameLabel = QLabel(parent=self)
-        self.nameLabel.setFont(self._font)
         self.nameLabel.setText("None")
         self.opacityLabel = QLabel(parent=self)
         self.opacityLabel.setAlignment(Qt.AlignRight)
-        self.opacityLabel.setFont(self._font)
         self.opacityLabel.setText("\u03B1=%0.1f%%" % (100.0 * (self.bar.fraction())))
         self.toggleEye = ToggleEye(parent=self)
         self.toggleEye.setActive(False)
-        self.toggleEye.setFixedWidth(35)
         self.toggleEye.setToolTip("Visibility")
         self.channelSelector = QSpinBox(parent=self)
         self.channelSelector.setFrame(False)
-        self.channelSelector.setFont(self._font)
-        self.channelSelector.setMaximumWidth(35)
+        self.channelSelector.setMaximumWidth(round(em() * self._CHANNEL_WIDTH_EM))
         self.channelSelector.setAlignment(Qt.AlignRight)
         self.channelSelector.setToolTip("Channel")
         self.channelSelector.setVisible(False)
@@ -208,9 +239,17 @@ class LayerItemWidget(QWidget):
         self._layout.addWidget(self.channelSelector, 1, 0)
         self._layout.addWidget(self.bar, 1, 1, 1, 2)
 
-        self._layout.setColumnMinimumWidth(0, 35)
+        self._layout.setColumnMinimumWidth(
+            0,
+            round(em() * self._EYE_COLUMN_EM),
+        )
         self._layout.setSpacing(0)
-        self._layout.setContentsMargins(5, 2, 5, 2)
+        self._layout.setContentsMargins(
+            round(em() * 0.30),
+            round(line_height() * 0.05),
+            round(em() * 0.30),
+            round(line_height() * 0.05),
+        )
 
         self.setLayout(self._layout)
 

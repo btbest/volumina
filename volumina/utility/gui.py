@@ -19,6 +19,8 @@
 # This information is also available on the ilastik web site at:
 # 		   http://ilastik.org/license/
 ###############################################################################
+from typing import Optional, Union
+
 from qtpy.QtCore import Qt, QSize
 from qtpy.QtGui import QPixmap
 from qtpy.QtWidgets import QApplication
@@ -34,6 +36,11 @@ def em():
     return QApplication.instance().fontMetrics().ascent()
 
 
+def line_height():
+    """Like `em` but includes descent (slightly larger). Better for vertical spacing/layout."""
+    return QApplication.instance().fontMetrics().height()
+
+
 def phys(logical):
     """Convert a logical pixel value to physical pixels on this device.
     To be avoided, but sometimes necessary to work around Qt scaling quirks."""
@@ -47,4 +54,21 @@ def scale_pixmap(pixmap: QPixmap, size: QSize):
         Qt.SmoothTransformation,
     )
     pixmap.setDevicePixelRatio(dpr())
+    return pixmap
+
+
+def get_responsive_pixmap(*args, logical_size: Optional[Union[QSize, int]] = None):
+    """
+    Load a pixmap with sane HiDPI behavior.
+    args: as passed to QPixmap
+    logical_size: Desired displayed size in logical pixels.
+    """
+    pixmap = QPixmap(*args)
+
+    if logical_size is not None:
+        if isinstance(logical_size, int):
+            logical_size = QSize(logical_size, logical_size)
+
+        pixmap = scale_pixmap(pixmap, logical_size)
+
     return pixmap
