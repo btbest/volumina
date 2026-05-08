@@ -142,7 +142,7 @@ class FractionSelectionBar(QWidget):
 class ToggleEye(QLabel):
     activeChanged = Signal(bool)
 
-    _ICON_EM = 1.8
+    _ICON_EM = 2.2
 
     def __init__(self, parent=None):
         super(ToggleEye, self).__init__(parent=parent)
@@ -194,7 +194,7 @@ class ToggleEye(QLabel):
 class LayerItemWidget(QWidget):
 
     _CHANNEL_WIDTH_EM = 2.5
-    _EYE_COLUMN_EM = 1.8
+    _EYE_COLUMN_EM = 2.2
 
     @property
     def layer(self):
