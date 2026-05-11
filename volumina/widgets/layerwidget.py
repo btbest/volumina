@@ -1,7 +1,7 @@
 ###############################################################################
 #   volumina: volume slicing and editing library
 #
-#       Copyright (C) 2011-2014, the ilastik developers
+#       Copyright (C) 2011-2026, the ilastik developers
 #                                <team@ilastik.org>
 #
 # This program is free software; you can redistribute it and/or
@@ -22,15 +22,24 @@
 from builtins import range
 from past.utils import old_div
 import warnings
-from qtpy.QtCore import Signal, Qt, QEvent, QRect, QSize, QTimer, QPoint, QItemSelectionModel
-from qtpy.QtGui import QPainter, QFontMetrics, QFont, QPalette, QMouseEvent, QPixmap
-from qtpy.QtWidgets import QStyledItemDelegate, QWidget, QListView, QStyle, QLabel, QGridLayout, QSpinBox, QApplication
+from qtpy.QtCore import Signal, Qt, QSize, QTimer, QItemSelectionModel
+from qtpy.QtGui import QPainter, QPalette, QIcon
+from qtpy.QtWidgets import (
+    QStyledItemDelegate,
+    QWidget,
+    QListView,
+    QToolButton,
+    QLabel,
+    QGridLayout,
+    QSpinBox,
+    QApplication,
+)
 
 
 from volumina.layer import Layer
 from volumina.layerstack import LayerStackModel
 from volumina.utility import ShortcutManager
-from volumina.utility.gui import em, line_height, get_responsive_pixmap
+from volumina.utility.gui import em, line_height
 from volumina.widgets.layercontextmenu import layercontextmenu
 
 
@@ -139,62 +148,40 @@ class FractionSelectionBar(QWidget):
         return frac
 
 
-class ToggleEye(QLabel):
+class ToggleEye(QToolButton):
     activeChanged = Signal(bool)
 
-    _ICON_EM = 2.2
-
     def __init__(self, parent=None):
-        super(ToggleEye, self).__init__(parent=parent)
-        self._active = True
+        super().__init__(parent)
+        self._eye_open_icon = QIcon(":icons/icons/stock-eye-20.png")
+        self._eye_closed_icon = QIcon(":icons/icons/stock-eye-20-gray.png")
 
-        icon_size = round(em() * self._ICON_EM)
-
-        self._eye_open = get_responsive_pixmap(
-            ":icons/icons/stock-eye-20.png",
-            logical_size=icon_size,
-        )
-        self._eye_closed = get_responsive_pixmap(
-            ":icons/icons/stock-eye-20-gray.png",
-            logical_size=icon_size,
-        )
-        self.setPixmap(self._eye_open)
-
-        # Keep label tightly wrapped around icon
-        self.setFixedSize(
-            QSize(
-                round(icon_size * 1.35),
-                round(line_height() * 1.05),
-            )
+        self.setCheckable(True)
+        self.setChecked(True)
+        self.setAutoRaise(True)
+        self.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        icon_size = round(line_height() * 1.25)
+        self.setIconSize(QSize(icon_size, icon_size))
+        self.setStyleSheet(
+            """
+            QToolButton { background: transparent; padding: 1px; }
+            QToolButton:pressed { background: transparent; }
+            """
         )
 
-    def active(self):
-        return self._active
+        self.toggled.connect(self._update_icon)
+        self._update_icon(self.isChecked())
 
-    def setActive(self, b):
-        if b == self._active:
-            return
-        self._active = b
-        if b:
-            self.setPixmap(self._eye_open)
-        else:
-            self.setPixmap(self._eye_closed)
+        self.setActive = self.setChecked  # legacy compatibility
 
-    def toggle(self):
-        if self.active():
-            self.setActive(False)
-        else:
-            self.setActive(True)
-
-    def mousePressEvent(self, ev):
-        self.toggle()
-        self.activeChanged.emit(self._active)
+    def _update_icon(self, visible):
+        self.setIcon(self._eye_open_icon if visible else self._eye_closed_icon)
+        self.activeChanged.emit(visible)
 
 
 class LayerItemWidget(QWidget):
 
-    _CHANNEL_WIDTH_EM = 2.5
-    _EYE_COLUMN_EM = 2.2
+    _CHANNEL_WIDTH_EM = 2
 
     @property
     def layer(self):
@@ -227,7 +214,8 @@ class LayerItemWidget(QWidget):
         self.toggleEye.setToolTip("Visibility")
         self.channelSelector = QSpinBox(parent=self)
         self.channelSelector.setFrame(False)
-        self.channelSelector.setMaximumWidth(round(em() * self._CHANNEL_WIDTH_EM))
+        channel_selector_width = round(line_height() * self._CHANNEL_WIDTH_EM)
+        self.channelSelector.setMaximumWidth(channel_selector_width)
         self.channelSelector.setAlignment(Qt.AlignRight)
         self.channelSelector.setToolTip("Channel")
         self.channelSelector.setVisible(False)
@@ -238,16 +226,12 @@ class LayerItemWidget(QWidget):
         self._layout.addWidget(self.opacityLabel, 0, 2)
         self._layout.addWidget(self.channelSelector, 1, 0)
         self._layout.addWidget(self.bar, 1, 1, 1, 2)
-
-        self._layout.setColumnMinimumWidth(
-            0,
-            round(em() * self._EYE_COLUMN_EM),
-        )
+        self._layout.setColumnMinimumWidth(0, channel_selector_width)
         self._layout.setSpacing(0)
         self._layout.setContentsMargins(
-            round(em() * 0.30),
+            0,
             round(line_height() * 0.05),
-            round(em() * 0.30),
+            0,
             round(line_height() * 0.05),
         )
 

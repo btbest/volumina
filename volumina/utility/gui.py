@@ -55,20 +55,3 @@ def scale_pixmap(pixmap: QPixmap, size: QSize):
     )
     pixmap.setDevicePixelRatio(dpr())
     return pixmap
-
-
-def get_responsive_pixmap(*args, logical_size: Optional[Union[QSize, int]] = None):
-    """
-    Load a pixmap with sane HiDPI behavior.
-    args: as passed to QPixmap
-    logical_size: Desired displayed size in logical pixels.
-    """
-    pixmap = QPixmap(*args)
-
-    if logical_size is not None:
-        if isinstance(logical_size, int):
-            logical_size = QSize(logical_size, logical_size)
-
-        pixmap = scale_pixmap(pixmap, logical_size)
-
-    return pixmap
