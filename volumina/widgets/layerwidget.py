@@ -184,6 +184,8 @@ class ToggleEye(QToolButton):
 class LayerItemWidget(QWidget):
 
     _CHANNEL_WIDTH = 2
+    _LAYER_PADDING = 0.05
+    _LAYER_PADDING_RIGHT = 0.2
 
     @property
     def layer(self):
@@ -232,9 +234,9 @@ class LayerItemWidget(QWidget):
         self._layout.setSpacing(0)
         self._layout.setContentsMargins(
             0,
-            round(line_height() * 0.05),
-            0,
-            round(line_height() * 0.05),
+            round(line_height() * self._LAYER_PADDING),
+            round(line_height() * self._LAYER_PADDING_RIGHT),
+            round(line_height() * self._LAYER_PADDING),
         )
 
         self.setLayout(self._layout)
