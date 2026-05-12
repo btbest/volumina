@@ -29,7 +29,6 @@ from qtpy.QtCore import QCoreApplication, QEvent, QPointF, QSize, Qt, Signal
 from qtpy.QtGui import QBrush, QColor, QFont, QIcon, QMouseEvent, QPainter, QPainterPath, QPen, QPixmap, QTransform
 from qtpy.QtWidgets import (
     QAbstractSpinBox,
-    QApplication,
     QCheckBox,
     QFrame,
     QHBoxLayout,
@@ -42,48 +41,28 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 from volumina.utility import ShortcutManager
+from volumina.utility.gui import dpr, line_height, scale_pixmap, phys
 from volumina.widgets.delayedSpinBox import DelayedSpinBox
 
 SPINBOX_CSS = "QSpinBox {{ color: {0}; background-color: {1}; border:0; }}"
 SPINBOX_CSS_BOLD = "QSpinBox {{ color: {0}; font: bold; background-color: {1}; border:0; }}"
 
-# Size multipliers relative to _em(). Tune these to adjust the overall
-# scale of the HUD without touching any other numbers.
+# Size multipliers relative to line_height().
 BUTTON_SIZE = 1.2  # icon button width and height
 SPACING_TN = 0.1  # tiny spacing between axis label and slice selector
 SPACING_SM = 0.2  # tight spacing between related elements
 SPACING_MD = 0.5  # spacing between groups
 SPACING_LG = 0.8  # spacing between major sections
-SLIDER_MIN = 0.6  # minimum width of the time slider (in em units)
-SLIDER_MAX = 13.0  # maximum width of the time slider (in em units)
-INDICATOR_MAX = 13.0  # maximum width of the busy indicator (in em units)
-
-
-def _em():
-    """Base UI unit.
-    Already accounts for DPI and the user's configured font size,
-    so all other sizing should be expressed as multiples of this."""
-    return QApplication.instance().fontMetrics().ascent()
-
-
-def _dpr():
-    return QApplication.instance().devicePixelRatio()
-
-
-def _phys(logical):
-    """Convert a logical pixel value to physical pixels on this device."""
-    return round(logical * _dpr())
+SLIDER_MIN = 0.6  # minimum width of the time slider
+SLIDER_MAX = 13.0  # maximum width of the time slider
+INDICATOR_MAX = 13.0  # maximum width of the busy indicator
 
 
 def _load_icon(filename, width, height):
-    dpr = _dpr()
-
     foreground = QPixmap()
     foreground.load(filename)
-    foreground.setDevicePixelRatio(dpr)
 
     pixmap = QPixmap(foreground.size())
-    pixmap.setDevicePixelRatio(dpr)
     pixmap.fill(Qt.transparent)
 
     painter = QPainter()
@@ -91,12 +70,7 @@ def _load_icon(filename, width, height):
     painter.drawPixmap(QPointF(0, 0), foreground)
     painter.end()
 
-    pixmap = pixmap.scaled(
-        QSize(_phys(width), _phys(height)),
-        Qt.KeepAspectRatio,
-        Qt.SmoothTransformation,
-    )
-    pixmap.setDevicePixelRatio(dpr)
+    pixmap = scale_pixmap(pixmap, QSize(phys(width), phys(height)))
     return pixmap
 
 
@@ -140,13 +114,13 @@ class LabelButtons(QLabel):
         pixmap = self.pixmap()
         if pixmap and not pixmap.isNull():
             # Center in physical pixels to avoid DPR rounding drift
-            dpr = _dpr()
+            ratio = dpr()
             pw = pixmap.width()  # physical pixels
             ph = pixmap.height()
-            ww = int(self.width() * dpr)  # widget width in physical pixels
-            wh = int(self.height() * dpr)
-            x = (ww - pw) / (2 * dpr)
-            y = (wh - ph) / (2 * dpr)
+            ww = int(self.width() * ratio)  # widget width in physical pixels
+            wh = int(self.height() * ratio)
+            x = (ww - pw) / (2 * ratio)
+            y = (wh - ph) / (2 * ratio)
             painter.drawPixmap(QPointF(x, y), pixmap)
 
         # Skip QLabel's own pixmap drawing
@@ -326,7 +300,7 @@ class ImageView2DHud(QWidget):
 
         self.layout = QHBoxLayout()
         self.setLayout(self.layout)
-        self.layout.setContentsMargins(0, int(_em() * SPACING_SM), 0, 0)
+        self.layout.setContentsMargins(0, int(line_height() * SPACING_SM), 0, 0)
         self.layout.setSpacing(0)
 
         self.buttons = {}
@@ -348,16 +322,16 @@ class ImageView2DHud(QWidget):
         button.clicked.connect(handler)
         setupFrameStyle(button)
         self.layout.addWidget(button)
-        self.layout.addSpacing(int(_em() * SPACING_SM))
+        self.layout.addSpacing(int(line_height() * SPACING_SM))
 
     def createImageView2DHud(self, axis, value, backgroundColor, foregroundColor):
         self.axis = axis
         self.backgroundColor = backgroundColor
         self.foregroundColor = foregroundColor
-        self.labelsWidth = int(_em() * BUTTON_SIZE)
-        self.labelsheight = int(_em() * BUTTON_SIZE)
+        self.labelsWidth = int(line_height() * BUTTON_SIZE)
+        self.labelsheight = int(line_height() * BUTTON_SIZE)
 
-        self.layout.addSpacing(int(_em() * SPACING_SM))
+        self.layout.addSpacing(int(line_height() * SPACING_SM))
 
         self.axisLabel = self.createAxisLabel()
         self.sliceSelector = SpinBoxImageView(
@@ -371,7 +345,7 @@ class ImageView2DHud(QWidget):
         leftHudLayout.setContentsMargins(0, 0, 0, 0)
         leftHudLayout.setSpacing(0)
         leftHudLayout.addWidget(self.axisLabel)
-        leftHudLayout.addSpacing(int(_em() * SPACING_TN))
+        leftHudLayout.addSpacing(int(line_height() * SPACING_TN))
         leftHudLayout.addLayout(self.sliceSelector)
 
         leftHudFrame = FilledFrame(backgroundColor)
@@ -380,7 +354,7 @@ class ImageView2DHud(QWidget):
         self.leftHudFrame = leftHudFrame
 
         self.layout.addWidget(leftHudFrame)
-        self.layout.addSpacing(int(_em() * SPACING_LG))
+        self.layout.addSpacing(int(line_height() * SPACING_LG))
 
         for name, handler in [
             ("rotate-left", self.on_rotLeftButton),
@@ -400,7 +374,7 @@ class ImageView2DHud(QWidget):
 
         self.buttons["zoomlevel"] = self.zoomLevelIndicator
         self.layout.addWidget(self.zoomLevelIndicator)
-        self.layout.addSpacing(int(_em() * SPACING_SM))
+        self.layout.addSpacing(int(line_height() * SPACING_SM))
 
         for name, handler in [
             ("export", self.on_exportButton),
@@ -456,9 +430,8 @@ class ImageView2DHud(QWidget):
         return axisLabel
 
     def createAxisLabelPixmap(self):
-        dpr = _dpr()
         canvas = 250
-        target = int(_em() * BUTTON_SIZE)
+        target = int(line_height() * BUTTON_SIZE)
         pixmap = QPixmap(canvas, canvas)
         pixmap.fill(self.backgroundColor)
         painter = QPainter()
@@ -473,12 +446,7 @@ class ImageView2DHud(QWidget):
         painter.drawPath(path)
         painter.setFont(font)
         painter.end()
-        pixmap = pixmap.scaled(
-            QSize(_phys(target), _phys(target)),
-            Qt.KeepAspectRatio,
-            Qt.SmoothTransformation,
-        )
-        pixmap.setDevicePixelRatio(dpr)
+        pixmap = scale_pixmap(pixmap, QSize(phys(target), phys(target)))
         return pixmap
 
     def setAxes(self, rotation, swapped):
@@ -487,8 +455,7 @@ class ImageView2DHud(QWidget):
 
 
 def _get_pos_widget(name, backgroundColor, foregroundColor):
-    dpr = _dpr()
-    target = int(_em() * BUTTON_SIZE)
+    target = int(line_height() * BUTTON_SIZE)
 
     label = QLabel()
     label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
@@ -511,12 +478,7 @@ def _get_pos_widget(name, backgroundColor, foregroundColor):
     painter.drawPath(path)
     painter.setFont(font)
     painter.end()
-    pixmap = pixmap.scaled(
-        QSize(_phys(target), _phys(target)),
-        Qt.KeepAspectRatio,
-        Qt.SmoothTransformation,
-    )
-    pixmap.setDevicePixelRatio(dpr)
+    pixmap = scale_pixmap(pixmap, QSize(phys(target), phys(target)))
     label.setPixmap(pixmap)
     label.setFixedSize(target, target)
     label.setAlignment(Qt.AlignCenter)
@@ -536,7 +498,7 @@ class QuadStatusBar(QHBoxLayout):
 
     def __init__(self, parent=None):
         QHBoxLayout.__init__(self, parent)
-        self.setContentsMargins(0, int(_em() * SPACING_SM), 0, 0)
+        self.setContentsMargins(0, int(line_height() * SPACING_SM), 0, 0)
         self.setSpacing(0)
 
     def showXYCoordinates(self):
@@ -583,7 +545,7 @@ class QuadStatusBar(QHBoxLayout):
         self.addWidget(self.zLabel)
         self.addWidget(self.zSpinBox)
 
-        self.addSpacing(int(_em() * SPACING_MD))
+        self.addSpacing(int(line_height() * SPACING_MD))
 
         self.crosshairsCheckbox = QCheckBox()
         self.crosshairsCheckbox.setChecked(False)
@@ -591,10 +553,10 @@ class QuadStatusBar(QHBoxLayout):
         self.crosshairsCheckbox.setText("Crosshairs")
         self.addWidget(self.crosshairsCheckbox)
 
-        self.addSpacing(int(_em() * SPACING_MD))
+        self.addSpacing(int(line_height() * SPACING_MD))
 
         self.busyIndicator = QProgressBar()
-        self.busyIndicator.setMaximumWidth(int(_em() * INDICATOR_MAX))
+        self.busyIndicator.setMaximumWidth(int(line_height() * INDICATOR_MAX))
         self.busyIndicator.setMaximum(0)
         self.busyIndicator.setMinimum(0)
         self.busyIndicator.setVisible(False)
@@ -604,7 +566,7 @@ class QuadStatusBar(QHBoxLayout):
 
         self.addStretch()
 
-        self.addSpacing(int(_em() * SPACING_LG))
+        self.addSpacing(int(line_height() * SPACING_LG))
 
         self.timeSpinBox = DelayedSpinBox(750)
 
@@ -621,8 +583,8 @@ class QuadStatusBar(QHBoxLayout):
         self.timePreviousButton.clicked.connect(self._onTimePreviousButtonClicked)
 
         self.timeSlider = QSlider(Qt.Horizontal)
-        self.timeSlider.setMinimumWidth(int(_em() * SLIDER_MIN))
-        self.timeSlider.setMaximumWidth(int(_em() * SLIDER_MAX))
+        self.timeSlider.setMinimumWidth(int(line_height() * SLIDER_MIN))
+        self.timeSlider.setMaximumWidth(int(line_height() * SLIDER_MAX))
         self.setToolTipTimeSlider()
         self.addWidget(self.timeSlider)
         self.timeSlider.valueChanged.connect(self._onTimeSliderChanged)

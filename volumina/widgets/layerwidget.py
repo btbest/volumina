@@ -1,7 +1,7 @@
 ###############################################################################
 #   volumina: volume slicing and editing library
 #
-#       Copyright (C) 2011-2014, the ilastik developers
+#       Copyright (C) 2011-2026, the ilastik developers
 #                                <team@ilastik.org>
 #
 # This program is free software; you can redistribute it and/or
@@ -22,14 +22,24 @@
 from builtins import range
 from past.utils import old_div
 import warnings
-from qtpy.QtCore import Signal, Qt, QEvent, QRect, QSize, QTimer, QPoint, QItemSelectionModel
-from qtpy.QtGui import QPainter, QFontMetrics, QFont, QPalette, QMouseEvent, QPixmap
-from qtpy.QtWidgets import QStyledItemDelegate, QWidget, QListView, QStyle, QLabel, QGridLayout, QSpinBox, QApplication
+from qtpy.QtCore import Signal, Qt, QSize, QTimer, QItemSelectionModel
+from qtpy.QtGui import QPainter, QPalette, QIcon
+from qtpy.QtWidgets import (
+    QStyledItemDelegate,
+    QWidget,
+    QListView,
+    QToolButton,
+    QLabel,
+    QGridLayout,
+    QSpinBox,
+    QApplication,
+)
 
 
 from volumina.layer import Layer
 from volumina.layerstack import LayerStackModel
 from volumina.utility import ShortcutManager
+from volumina.utility.gui import line_height
 from volumina.widgets.layercontextmenu import layercontextmenu
 
 
@@ -40,10 +50,15 @@ PREV_CHANNEL_SEQ = "Ctrl+P"
 class FractionSelectionBar(QWidget):
     fractionChanged = Signal(float)
 
+    _DEFAULT_WIDTH = 8.0
+    _DEFAULT_HEIGHT = 0.65
+    _MIN_HEIGHT = 0.15
+
     def __init__(self, initial_fraction=1.0, parent=None):
         super(FractionSelectionBar, self).__init__(parent=parent)
         self._fraction = initial_fraction
         self._lmbDown = False
+        self.setFixedHeight(round(line_height() * self._DEFAULT_HEIGHT))
 
     def fraction(self):
         return self._fraction
@@ -84,29 +99,38 @@ class FractionSelectionBar(QWidget):
     def paintEvent(self, ev):
         painter = QPainter(self)
 
-        # calc bar offset
-        y_offset = (self.height() - self._barHeight()) // 2
-        ## prevent negative offset
-        y_offset = 0 if y_offset < 0 else y_offset
+        # Switch to physical-pixel coordinates
+        ratio = painter.device().devicePixelRatioF()
+        painter.scale(1.0 / ratio, 1.0 / ratio)
+        w = round(self.width() * ratio)
+        h = round(self.height() * ratio)
+        border_thickness = 1
 
-        # frame around fraction indicator
-        painter.setBrush(self.palette().dark())
-        painter.save()
-        ## no fill color
-        b = painter.brush()
-        b.setStyle(Qt.NoBrush)
-        painter.setBrush(b)
-        painter.drawRect(QRect(QPoint(0, y_offset), QSize(self._barWidth(), self._barHeight())))
-        painter.restore()
+        if w <= 1 or h <= 1:
+            return
 
-        # fraction indicator
-        painter.drawRect(QRect(QPoint(0, y_offset), QSize(int(self._barWidth() * self._fraction), self._barHeight())))
+        border = self.palette().color(QPalette.Text)
+        fill = self.palette().dark().color()
+
+        painter.fillRect(0, 0, w, border_thickness, border)
+        painter.fillRect(0, h - border_thickness, w, border_thickness, border)
+        painter.fillRect(0, 0, border_thickness, h, border)
+        painter.fillRect(w - border_thickness, 0, border_thickness, h, border)
+        inner_w = max(0, w - 2 * border_thickness)
+        inner_h = max(0, h - 2 * border_thickness)
+        fill_w = int(inner_w * self._fraction)
+
+        if fill_w > 0 and inner_h > 0:
+            painter.fillRect(border_thickness, border_thickness, fill_w, inner_h, fill)
 
     def sizeHint(self):
-        return QSize(100, 10)
+        return QSize(
+            round(line_height() * self._DEFAULT_WIDTH),
+            round(line_height() * self._DEFAULT_HEIGHT),
+        )
 
     def minimumSizeHint(self):
-        return QSize(1, 3)
+        return QSize(1, max(2, round(line_height() * self._MIN_HEIGHT)))
 
     def _barWidth(self):
         return self.width() - 1
@@ -124,40 +148,45 @@ class FractionSelectionBar(QWidget):
         return frac
 
 
-class ToggleEye(QLabel):
+class ToggleEye(QToolButton):
+    _EYE_SIZE = 1.25
+
     activeChanged = Signal(bool)
 
     def __init__(self, parent=None):
-        super(ToggleEye, self).__init__(parent=parent)
-        self._active = True
-        self._eye_open = QPixmap(":icons/icons/stock-eye-20.png")
-        self._eye_closed = QPixmap(":icons/icons/stock-eye-20-gray.png")
-        self.setPixmap(self._eye_open)
+        super().__init__(parent)
+        self._eye_open_icon = QIcon(":icons/icons/stock-eye-20.png")
+        self._eye_closed_icon = QIcon(":icons/icons/stock-eye-20-gray.png")
 
-    def active(self):
-        return self._active
+        self.setCheckable(True)
+        self.setChecked(True)
+        self.setAutoRaise(True)
+        self.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        icon_size = round(line_height() * self._EYE_SIZE)
+        self.setIconSize(QSize(icon_size, icon_size))
+        self.setStyleSheet(
+            """
+            QToolButton { background: transparent; padding: 1px; }
+            QToolButton:pressed { background: transparent; }
+            """
+        )
 
-    def setActive(self, b):
-        if b == self._active:
-            return
-        self._active = b
-        if b:
-            self.setPixmap(self._eye_open)
-        else:
-            self.setPixmap(self._eye_closed)
+        self.toggled.connect(self._update_icon)
+        self._update_icon(self.isChecked())
 
-    def toggle(self):
-        if self.active():
-            self.setActive(False)
-        else:
-            self.setActive(True)
+        self.setActive = self.setChecked  # legacy compatibility
 
-    def mousePressEvent(self, ev):
-        self.toggle()
-        self.activeChanged.emit(self._active)
+    def _update_icon(self, visible):
+        self.setIcon(self._eye_open_icon if visible else self._eye_closed_icon)
+        self.activeChanged.emit(visible)
 
 
 class LayerItemWidget(QWidget):
+
+    _CHANNEL_WIDTH = 2
+    _LAYER_PADDING = 0.05
+    _LAYER_PADDING_RIGHT = 0.2
+
     @property
     def layer(self):
         return self._layer
@@ -178,25 +207,19 @@ class LayerItemWidget(QWidget):
         super(LayerItemWidget, self).__init__(parent=parent)
         self._layer = None
 
-        self._font = QFont(QFont().defaultFamily(), 9)
-        self._fm = QFontMetrics(self._font)
         self.bar = FractionSelectionBar(initial_fraction=0.0)
-        self.bar.setFixedHeight(10)
         self.nameLabel = QLabel(parent=self)
-        self.nameLabel.setFont(self._font)
         self.nameLabel.setText("None")
         self.opacityLabel = QLabel(parent=self)
         self.opacityLabel.setAlignment(Qt.AlignRight)
-        self.opacityLabel.setFont(self._font)
         self.opacityLabel.setText("\u03B1=%0.1f%%" % (100.0 * (self.bar.fraction())))
         self.toggleEye = ToggleEye(parent=self)
         self.toggleEye.setActive(False)
-        self.toggleEye.setFixedWidth(35)
         self.toggleEye.setToolTip("Visibility")
         self.channelSelector = QSpinBox(parent=self)
         self.channelSelector.setFrame(False)
-        self.channelSelector.setFont(self._font)
-        self.channelSelector.setMaximumWidth(35)
+        channel_selector_width = round(line_height() * self._CHANNEL_WIDTH)
+        self.channelSelector.setMaximumWidth(channel_selector_width)
         self.channelSelector.setAlignment(Qt.AlignRight)
         self.channelSelector.setToolTip("Channel")
         self.channelSelector.setVisible(False)
@@ -207,10 +230,14 @@ class LayerItemWidget(QWidget):
         self._layout.addWidget(self.opacityLabel, 0, 2)
         self._layout.addWidget(self.channelSelector, 1, 0)
         self._layout.addWidget(self.bar, 1, 1, 1, 2)
-
-        self._layout.setColumnMinimumWidth(0, 35)
+        self._layout.setColumnMinimumWidth(0, channel_selector_width)
         self._layout.setSpacing(0)
-        self._layout.setContentsMargins(5, 2, 5, 2)
+        self._layout.setContentsMargins(
+            0,
+            round(line_height() * self._LAYER_PADDING),
+            round(line_height() * self._LAYER_PADDING_RIGHT),
+            round(line_height() * self._LAYER_PADDING),
+        )
 
         self.setLayout(self._layout)
 
