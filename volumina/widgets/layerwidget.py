@@ -39,7 +39,7 @@ from qtpy.QtWidgets import (
 from volumina.layer import Layer
 from volumina.layerstack import LayerStackModel
 from volumina.utility import ShortcutManager
-from volumina.utility.gui import em, line_height
+from volumina.utility.gui import line_height
 from volumina.widgets.layercontextmenu import layercontextmenu
 
 
@@ -50,15 +50,15 @@ PREV_CHANNEL_SEQ = "Ctrl+P"
 class FractionSelectionBar(QWidget):
     fractionChanged = Signal(float)
 
-    _DEFAULT_WIDTH_EM = 8.0
-    _DEFAULT_HEIGHT_EM = 0.65
-    _MIN_HEIGHT_EM = 0.15
+    _DEFAULT_WIDTH = 8.0
+    _DEFAULT_HEIGHT = 0.65
+    _MIN_HEIGHT = 0.15
 
     def __init__(self, initial_fraction=1.0, parent=None):
         super(FractionSelectionBar, self).__init__(parent=parent)
         self._fraction = initial_fraction
         self._lmbDown = False
-        self.setFixedHeight(round(em() * self._DEFAULT_HEIGHT_EM))
+        self.setFixedHeight(round(line_height() * self._DEFAULT_HEIGHT))
 
     def fraction(self):
         return self._fraction
@@ -125,12 +125,12 @@ class FractionSelectionBar(QWidget):
 
     def sizeHint(self):
         return QSize(
-            round(em() * self._DEFAULT_WIDTH_EM),
-            round(em() * self._DEFAULT_HEIGHT_EM),
+            round(line_height() * self._DEFAULT_WIDTH),
+            round(line_height() * self._DEFAULT_HEIGHT),
         )
 
     def minimumSizeHint(self):
-        return QSize(1, max(2, round(em() * self._MIN_HEIGHT_EM)))
+        return QSize(1, max(2, round(line_height() * self._MIN_HEIGHT)))
 
     def _barWidth(self):
         return self.width() - 1
@@ -149,6 +149,8 @@ class FractionSelectionBar(QWidget):
 
 
 class ToggleEye(QToolButton):
+    _EYE_SIZE = 1.25
+
     activeChanged = Signal(bool)
 
     def __init__(self, parent=None):
@@ -160,7 +162,7 @@ class ToggleEye(QToolButton):
         self.setChecked(True)
         self.setAutoRaise(True)
         self.setToolButtonStyle(Qt.ToolButtonIconOnly)
-        icon_size = round(line_height() * 1.25)
+        icon_size = round(line_height() * self._EYE_SIZE)
         self.setIconSize(QSize(icon_size, icon_size))
         self.setStyleSheet(
             """
@@ -181,7 +183,7 @@ class ToggleEye(QToolButton):
 
 class LayerItemWidget(QWidget):
 
-    _CHANNEL_WIDTH_EM = 2
+    _CHANNEL_WIDTH = 2
 
     @property
     def layer(self):
@@ -214,7 +216,7 @@ class LayerItemWidget(QWidget):
         self.toggleEye.setToolTip("Visibility")
         self.channelSelector = QSpinBox(parent=self)
         self.channelSelector.setFrame(False)
-        channel_selector_width = round(line_height() * self._CHANNEL_WIDTH_EM)
+        channel_selector_width = round(line_height() * self._CHANNEL_WIDTH)
         self.channelSelector.setMaximumWidth(channel_selector_width)
         self.channelSelector.setAlignment(Qt.AlignRight)
         self.channelSelector.setToolTip("Channel")

@@ -19,35 +19,32 @@
 # This information is also available on the ilastik web site at:
 # 		   http://ilastik.org/license/
 ###############################################################################
-from typing import Optional, Union
-
 from qtpy.QtCore import Qt, QSize
 from qtpy.QtGui import QPixmap
 from qtpy.QtWidgets import QApplication
 
 
-def dpr():
-    return QApplication.instance().devicePixelRatio()
-
-
-def em():
-    """DPI-aware UI sizing unit based on current font metrics, similar to CSS 'em'.
-    Preferred base unit for specifying sizes of UI elements"""
-    return QApplication.instance().fontMetrics().ascent()
-
-
-def line_height():
-    """Like `em` but includes descent (slightly larger). Better for vertical spacing/layout."""
+def line_height() -> int:
+    """
+    Physical pixels per text line at font display size on this display.
+    Similar to CSS 'em', this serves as a base unit for specifying sizes of UI elements.
+    Typically around 13 on laptop or older screens, or around 30 on 4K screens."""
     return QApplication.instance().fontMetrics().height()
 
 
-def phys(logical):
+def dpr() -> float:
+    """Device display scaling factor.
+    On Win, corresponds to display scaling setting (e.g. 150%, 200% -> 1.5, 2.0)."""
+    return QApplication.instance().devicePixelRatio()
+
+
+def phys(logical) -> int:
     """Convert a logical pixel value to physical pixels on this device.
     To be avoided, but sometimes necessary to work around Qt scaling quirks."""
     return round(logical * dpr())
 
 
-def scale_pixmap(pixmap: QPixmap, size: QSize):
+def scale_pixmap(pixmap: QPixmap, size: QSize) -> QPixmap:
     pixmap = pixmap.scaled(
         size,
         Qt.KeepAspectRatio,

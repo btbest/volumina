@@ -4,7 +4,7 @@ from qtpy.QtWidgets import QWidget
 from qtpy.QtCore import Signal, Slot, QSize
 from qtpy.uic import loadUiType
 
-from volumina.utility.gui import em
+from volumina.utility.gui import line_height
 
 
 class Overview3D(QWidget):
@@ -30,6 +30,9 @@ class Overview3D(QWidget):
         dock_status_changed: indicates that the dock button was toggled
     """
 
+    _ICON_SIZE = 1.3
+    _BUTTON_SIZE = 1.9
+
     slice_changed = Signal()
     reinitialized = Signal()  # TODO: this should not be necessary: remove
     dock_status_changed = Signal(bool)
@@ -44,8 +47,8 @@ class Overview3D(QWidget):
         cls, _ = loadUiType(join(split(__file__)[0], "ui/view3d.ui"))
         self._ui = cls()
         self._ui.setupUi(self)
-        icon_size = int(em() * 1.3)
-        button_size = int(em() * 1.9)
+        icon_size = int(line_height() * self._ICON_SIZE)
+        button_size = int(line_height() * self._BUTTON_SIZE)
         for btn in (self._ui.toggle_slice_x, self._ui.toggle_slice_y, self._ui.toggle_slice_z, self._ui.dock):
             btn.setIconSize(QSize(icon_size, icon_size))
             btn.setFixedSize(QSize(button_size, button_size))
